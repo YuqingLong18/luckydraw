@@ -2,7 +2,7 @@ import React from 'react';
 import { useStore } from '../../state/store';
 import { CONSTANTS } from '../../utils/constants';
 
-const Controls: React.FC = () => {
+const Controls: React.FC<{ onImport?: () => void }> = ({ onImport }) => {
     const phase = useStore((state) => state.phase);
     const startDraw = useStore((state) => state.startDraw);
     const completeDraw = useStore((state) => state.completeDraw);
@@ -50,7 +50,7 @@ const Controls: React.FC = () => {
     };
 
     return (
-        <div style={{ position: 'absolute', bottom: 20, left: 20, display: 'flex', gap: 10, zIndex: 100 }}>
+        <div style={{ position: 'absolute', bottom: 20, left: 20, display: 'flex', flexWrap: 'wrap', gap: 10, zIndex: 100, maxWidth: 'min(520px, calc(100vw - 40px))' }}>
             <button
                 onClick={handleRun}
                 disabled={phase === 'RUNNING' || (phase === 'IDLE' && remainingNames.length === 0)}
@@ -64,7 +64,8 @@ const Controls: React.FC = () => {
             >
                 {getButtonText()}
             </button>
-            <button onClick={reset} disabled={phase === 'RUNNING'}>Reset</button>
+            <button onClick={reset} disabled={phase === 'RUNNING'} style={{ padding: '0.8em 1.2em' }}>Reset</button>
+            <button onClick={onImport} disabled={phase === 'RUNNING' || !onImport} style={{ padding: '0.8em 1.2em' }}>Import Names</button>
         </div>
     );
 };

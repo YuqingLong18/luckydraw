@@ -18,13 +18,7 @@ function App() {
     <Layout>
       <Scene />
 
-      <Controls />
-      <button
-        onClick={() => setShowImport(true)}
-        style={{ position: 'absolute', bottom: 20, left: 240, zIndex: 100 }}
-      >
-        Import Names
-      </button>
+      <Controls onImport={() => setShowImport(true)} />
 
       <WinnersPanel />
       <WinnerOverlay />
@@ -32,7 +26,7 @@ function App() {
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
 
       <div style={{ position: 'absolute', top: 20, left: 20, color: 'white', zIndex: 10 }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontFamily: '"Mountains of Christmas", serif' }}>Lucky Draw</h1>
+        <h1 style={{ margin: 0, fontSize: '1.5rem', fontFamily: '"Mountains of Christmas", serif' }}>THIS Christmas Lucky Draw</h1>
       </div>
     </Layout>
   );
