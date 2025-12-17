@@ -2,6 +2,7 @@ import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { CONSTANTS } from '../../utils/constants';
+import { createMulberry32 } from '../../utils/random';
 
 const vertexShader = `
   uniform float uTime;
@@ -43,6 +44,7 @@ const ChristmasTree: React.FC = () => {
     const pointsRef = useRef<THREE.Points>(null);
 
     const { positions, sizes, speeds, offsets, colors } = useMemo(() => {
+        const rand = createMulberry32(0xdecafbad);
         const count = 5000; // Increased count for fuller tree
         const positions = new Float32Array(count * 3);
         const sizes = new Float32Array(count);
@@ -63,7 +65,7 @@ const ChristmasTree: React.FC = () => {
             // Create a layered cone effect or just simple cone?
             // Simple cone with volume.
 
-            const h = Math.random() * height; // 0 to height (bottom to top relative)
+            const h = rand() * height; // 0 to height (bottom to top relative)
             // Actually our tree works better -height/2 to height/2
             const y = h - height / 2;
             const normalizedY = h / height; // 0 to 1
@@ -71,8 +73,8 @@ const ChristmasTree: React.FC = () => {
             const rAtHeight = maxRadius * (1 - normalizedY);
 
             // Volume distribution: more points near surface, some inside
-            const r = rAtHeight * Math.sqrt(Math.random()); // Sqrt for uniform area, but maybe we want surface mostly
-            const theta = Math.random() * Math.PI * 2;
+            const r = rAtHeight * Math.sqrt(rand()); // Sqrt for uniform area, but maybe we want surface mostly
+            const theta = rand() * Math.PI * 2;
 
             const x = r * Math.cos(theta);
             const z = r * Math.sin(theta);
@@ -81,13 +83,13 @@ const ChristmasTree: React.FC = () => {
             positions[i * 3 + 1] = y;
             positions[i * 3 + 2] = z;
 
-            sizes[i] = Math.random() * 0.4 + 0.1;
-            speeds[i] = Math.random() * 5 + 1;
-            offsets[i] = Math.random() * 10;
+            sizes[i] = rand() * 0.4 + 0.1;
+            speeds[i] = rand() * 5 + 1;
+            offsets[i] = rand() * 10;
 
             // Color logic
             // Mostly green.
-            const choice = Math.random();
+            const choice = rand();
             let col = green;
 
             if (choice > 0.95) col = gold; // Ornaments
@@ -108,12 +110,9 @@ const ChristmasTree: React.FC = () => {
     }), []);
 
     useFrame((state) => {
-        if (pointsRef.current && pointsRef.current.material) {
-            // @ts-ignore
-            if (pointsRef.current.material.uniforms) {
-                // @ts-ignore
-                pointsRef.current.material.uniforms.uTime.value = state.clock.elapsedTime;
-            }
+        const points = pointsRef.current;
+        if (points && points.material instanceof THREE.ShaderMaterial) {
+            points.material.uniforms.uTime.value = state.clock.elapsedTime;
             // Rotation is handled by CAMERA now mostly, but tree can rotate slowly too?
             // User asked for "Rotate faster" during draw. 
             // Usually we rotate the object or orbit the camera.

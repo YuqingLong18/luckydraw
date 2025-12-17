@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import type { Text as TroikaText } from 'troika-three-text';
 import { useStore } from '../../state/store';
 import { getTreePosition } from '../../utils/layout';
 
@@ -12,14 +13,25 @@ const NameLabel: React.FC<{
     isHighlighted: boolean;
 }> = React.memo(({ name, position, rotation, isHighlighted }) => {
     // Memoize to prevent re-renders of all 140 labels every frame
-    const textRef = useRef<any>(null);
+    const textRef = useRef<TroikaText | null>(null);
+    const billboardRef = useRef({
+        parentWorldQuat: new THREE.Quaternion(),
+        invParentWorldQuat: new THREE.Quaternion(),
+    });
     const color = isHighlighted ? '#ffd700' : 'white';
     // const scaleFactor = isHighlighted ? 1.5 : (PlatformMobile() ? 0.5 : 0.8); // Smaller default, big highlight - UNUSED in my logic below because I set scale in useFrame
 
     useFrame((state) => {
         if (!textRef.current) return;
 
-        // Billboarding? No, they are stuck to tree.
+        // Billboard towards camera so names stay readable while the tree rotates/zooms.
+        const parent = textRef.current.parent as THREE.Object3D | null;
+        if (parent) {
+            parent.getWorldQuaternion(billboardRef.current.parentWorldQuat);
+            billboardRef.current.invParentWorldQuat.copy(billboardRef.current.parentWorldQuat).invert();
+            textRef.current.quaternion.copy(billboardRef.current.invParentWorldQuat).multiply(state.camera.quaternion);
+        }
+
         // Pulse if highlighted
         if (isHighlighted) {
             const s = 1.5 + Math.sin(state.clock.elapsedTime * 15) * 0.3;
@@ -27,7 +39,7 @@ const NameLabel: React.FC<{
             textRef.current.color = new THREE.Color('#ffd700');
             textRef.current.fillOpacity = 1;
         } else {
-            textRef.current.scale.set(0.6, 0.6, 0.6); // Base scale
+            textRef.current.scale.set(0.8, 0.8, 0.8); // Base scale
             textRef.current.color = 'white';
             textRef.current.fillOpacity = 0.9;
         }
@@ -38,7 +50,7 @@ const NameLabel: React.FC<{
             ref={textRef}
             position={position}
             rotation={rotation}
-            fontSize={0.4} // Smaller font to fit more
+            fontSize={0.48}
             color={color}
             anchorX="center"
             anchorY="middle"
@@ -50,13 +62,10 @@ const NameLabel: React.FC<{
         </Text>
     );
 });
-
-function PlatformMobile() {
-    return window.innerWidth < 600;
-}
-
 const NameLabels: React.FC = () => {
     const remainingNames = useStore((state) => state.remainingNames);
+    const phase = useStore((state) => state.phase);
+    const currentWinner = useStore((state) => state.currentWinner);
 
     // Need to know the winner to highlight? 
     // The store `winners` has history. The logic for "who is being drawn" is disjoint.
@@ -77,10 +86,36 @@ const NameLabels: React.FC = () => {
 
     // OR better: Map all `remainingNames` to the first N slots.
 
+    const indexByName = useMemo(() => {
+        const map = new Map<string, number>();
+        for (let i = 0; i < remainingNames.length; i++) map.set(remainingNames[i], i);
+        return map;
+    }, [remainingNames]);
+
+    const visibleNames = useMemo(() => {
+        const MAX_VISIBLE = 48;
+        if (remainingNames.length <= MAX_VISIBLE) return remainingNames;
+
+        const stride = Math.ceil(remainingNames.length / MAX_VISIBLE);
+        const sampled: string[] = [];
+        for (let i = 0; i < remainingNames.length && sampled.length < MAX_VISIBLE; i += stride) {
+            sampled.push(remainingNames[i]);
+        }
+
+        if (phase === 'WINNER_VIEW' && currentWinner && !sampled.includes(currentWinner)) {
+            sampled[sampled.length - 1] = currentWinner;
+        }
+
+        return sampled;
+    }, [remainingNames, phase, currentWinner]);
+
     return (
         <group>
-            {remainingNames.map((name, i) => {
-                const { position, rotation } = getTreePosition(i, remainingNames.length); // Recalculate based on current count?
+            {visibleNames.map((name) => {
+                const idx = indexByName.get(name);
+                if (idx === undefined) return null;
+
+                const { position, rotation } = getTreePosition(idx, remainingNames.length); // Recalculate based on current count?
                 // If we recalc based on current count, everyone moves when one is removed.
                 // That might be a cool effect? "Re-shuffling" on the tree.
                 // Or distracting.

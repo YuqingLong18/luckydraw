@@ -3,91 +3,112 @@ import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useStore } from '../../state/store';
 import { getTreePosition } from '../../utils/layout';
+import { CONSTANTS } from '../../utils/constants';
 
-const CameraController: React.FC<{ treeGroupRef: React.RefObject<THREE.Group> }> = ({ treeGroupRef }) => {
+function clamp01(value: number) {
+    return Math.min(1, Math.max(0, value));
+}
+
+function easeOutCubic(t: number) {
+    const p = 1 - t;
+    return 1 - p * p * p;
+}
+
+const CameraController: React.FC<{ treeGroupRef: React.RefObject<THREE.Group | null> }> = ({ treeGroupRef }) => {
     const { camera } = useThree();
     const phase = useStore((state) => state.phase);
     const currentWinner = useStore((state) => state.currentWinner);
     const remainingNames = useStore((state) => state.remainingNames);
 
-    const stateRef = useRef({ time: 0 });
+    const stateRef = useRef({
+        runningTime: 0,
+        winnerTime: 0,
+        winnerStartPos: new THREE.Vector3(),
+        tmpWinnerLocal: new THREE.Vector3(),
+        tmpWinnerWorld: new THREE.Vector3(),
+        tmpUp: new THREE.Vector3(0, 1, 0),
+        tmpNormal: new THREE.Vector3(),
+        tmpCamTarget: new THREE.Vector3(),
+        tmpCamPosA: new THREE.Vector3(),
+        tmpCamPosB: new THREE.Vector3(),
+    });
 
     useEffect(() => {
         if (phase === 'RUNNING') {
-            stateRef.current.time = 0;
+            stateRef.current.runningTime = 0;
+            stateRef.current.winnerTime = 0;
         }
-    }, [phase]);
+        if (phase === 'WINNER_VIEW') {
+            stateRef.current.winnerTime = 0;
+            stateRef.current.winnerStartPos.copy(camera.position);
+        }
+    }, [phase, camera]);
 
     useFrame((_state, delta) => {
-        if (!treeGroupRef.current) return;
-
         const group = treeGroupRef.current;
+        if (!group) return;
 
         if (phase === 'RUNNING') {
-            stateRef.current.time += delta;
-            const t = stateRef.current.time;
+            stateRef.current.runningTime += delta;
+            const t = stateRef.current.runningTime;
 
-            // Phase 1: Spin up (0-2s)
-            // Phase 2: High speed spin (2-8s)
-            // Phase 3: Decel + alignment (8-10s)
+            const duration = CONSTANTS.DRAW.COMPLETE_AT_S;
+            const p = clamp01(t / duration);
+            const eased = easeOutCubic(p);
 
-            // Rotation speed logic
-            let speed = 0;
-            if (t < 2) {
-                speed = THREE.MathUtils.lerp(0.5, 15, t / 2);
-            } else if (t < 8) {
-                speed = 15;
-            } else if (t < 10) {
-                speed = THREE.MathUtils.lerp(15, 0, (t - 8) / 2);
-            } else {
-                speed = 0;
-            }
+            // Start faster then slow down, so names are readable by mid-run.
+            const startSpeed = 3.2; // rad/s
+            const endSpeed = 0.35; // rad/s
+            const speed = THREE.MathUtils.lerp(startSpeed, endSpeed, eased);
 
-            // Apply rotation
-            group.rotation.y += speed * delta;
-            group.rotation.y = group.rotation.y % (Math.PI * 2);
+            group.rotation.y = (group.rotation.y + speed * delta) % (Math.PI * 2);
 
-            // While running, keep camera at standard distance
-            camera.position.lerp(new THREE.Vector3(0, 5, 30), 0.05);
-            camera.lookAt(0, 0, 0);
+            // Gradually zoom in during the rotation.
+            const startZ = 26;
+            const endZ = 14.5;
+            const z = THREE.MathUtils.lerp(startZ, endZ, eased);
+
+            const startY = 5.3;
+            const endY = 4.6;
+            const y = THREE.MathUtils.lerp(startY, endY, eased);
+
+            stateRef.current.tmpCamTarget.set(0, 0, 0);
+            stateRef.current.tmpCamPosA.set(0, y, z);
+            camera.position.lerp(stateRef.current.tmpCamPosA, 0.08);
+            camera.lookAt(stateRef.current.tmpCamTarget);
 
         } else if (phase === 'WINNER_VIEW' && currentWinner) {
-            // Stop rotation
-            // group.rotation.y += 0;
+            stateRef.current.winnerTime += delta;
+            const p = clamp01(stateRef.current.winnerTime / CONSTANTS.DRAW.REVEAL_S);
+            const eased = easeOutCubic(p);
 
             // Zoom to winner
-            // Find index of currentWinner in remainingNames (it MUST be there)
             const idx = remainingNames.indexOf(currentWinner);
             if (idx !== -1) {
                 const { position } = getTreePosition(idx, remainingNames.length);
-                const winnerLocalPos = new THREE.Vector3(...position);
+                stateRef.current.tmpWinnerLocal.set(position[0], position[1], position[2]);
 
                 // Current World Pos of Winner:
-                const winnerWorldPos = winnerLocalPos.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), group.rotation.y);
+                stateRef.current.tmpWinnerWorld.copy(stateRef.current.tmpWinnerLocal).applyAxisAngle(stateRef.current.tmpUp, group.rotation.y);
 
                 // We want to be in front of the winner.
                 // Target Camera Pos: along the normal, 4 units away
-                const normal = winnerWorldPos.clone().normalize();
-                const targetCamPos = winnerWorldPos.clone().add(normal.multiplyScalar(4));
+                stateRef.current.tmpNormal.copy(stateRef.current.tmpWinnerWorld).normalize();
+                stateRef.current.tmpCamPosB.copy(stateRef.current.tmpWinnerWorld).add(stateRef.current.tmpNormal.multiplyScalar(4));
 
-                // Smoothly move camera
-                camera.position.lerp(targetCamPos, 0.1);
+                // Smoothly move camera (finish in the reveal window).
+                camera.position.lerpVectors(stateRef.current.winnerStartPos, stateRef.current.tmpCamPosB, eased);
 
                 // Look at winner
-                // Since `lerp` doesn't rotate, we need to manually slerp quaternion or just lookAt every frame.
-                // lookAt is rigid, but if position moves smooth, lookAt should be mostly smooth.
-                camera.lookAt(winnerWorldPos);
+                camera.lookAt(stateRef.current.tmpWinnerWorld);
             }
 
         } else {
             // IDLE (and default)
-            // Rotate 1/2 slower -> 0.1
-            group.rotation.y += 0.1 * delta;
+            group.rotation.y = (group.rotation.y + 0.12 * delta) % (Math.PI * 2);
 
-            // "Zoom in closer to the tree gradually"
-            // Let's target z=18 (closer than standard 30)
-            // Usage of a very slow lerp factor gives "gradual" feel
-            camera.position.lerp(new THREE.Vector3(0, 5, 18), 0.02);
+            stateRef.current.tmpCamPosA.set(0, 5.0, 18.5);
+            camera.position.lerp(stateRef.current.tmpCamPosA, 0.03);
             camera.lookAt(0, 0, 0);
         }
     });

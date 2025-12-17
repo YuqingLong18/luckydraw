@@ -1,5 +1,6 @@
 import React from 'react';
 import { useStore } from '../../state/store';
+import { CONSTANTS } from '../../utils/constants';
 
 const Controls: React.FC = () => {
     const phase = useStore((state) => state.phase);
@@ -8,6 +9,16 @@ const Controls: React.FC = () => {
     const dismissWinner = useStore((state) => state.dismissWinner);
     const reset = useStore((state) => state.reset);
     const remainingNames = useStore((state) => state.remainingNames);
+    const completeTimeoutRef = React.useRef<number | null>(null);
+
+    React.useEffect(() => {
+        return () => {
+            if (completeTimeoutRef.current !== null) {
+                window.clearTimeout(completeTimeoutRef.current);
+                completeTimeoutRef.current = null;
+            }
+        };
+    }, []);
 
     const handleRun = () => {
         if (phase === 'WINNER_VIEW') {
@@ -18,14 +29,16 @@ const Controls: React.FC = () => {
         if (phase === 'IDLE' && remainingNames.length > 0) {
             startDraw();
 
-            // Animation duration before revealing winner
-            // Ignition (1.5) + Spin (7) + Decel (1.5) = 10s
-            // We want to switch to "Winner View" (Zoom) at around 10s.
-            const duration = 10000;
+            if (completeTimeoutRef.current !== null) {
+                window.clearTimeout(completeTimeoutRef.current);
+                completeTimeoutRef.current = null;
+            }
 
-            setTimeout(() => {
+            const completeAtMs = Math.max(0, Math.round(CONSTANTS.DRAW.COMPLETE_AT_S * 1000));
+            completeTimeoutRef.current = window.setTimeout(() => {
                 completeDraw();
-            }, duration);
+                completeTimeoutRef.current = null;
+            }, completeAtMs);
         }
     };
 

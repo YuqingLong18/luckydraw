@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Scene from './components/Scene/Scene';
 import Layout from './components/UI/Layout';
 import Controls from './components/UI/Controls';
 import WinnersPanel from './components/UI/WinnersPanel';
 import WinnerOverlay from './components/UI/WinnerOverlay';
 import ImportModal from './components/UI/ImportModal';
-import { useStore } from './state/store';
 
 function App() {
   const [showImport, setShowImport] = useState(false);
-  const remainingNames = useStore(state => state.remainingNames);
 
   // Auto-open import if empty?
   useEffect(() => {

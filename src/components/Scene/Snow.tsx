@@ -2,23 +2,26 @@ import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { CONSTANTS } from '../../utils/constants';
+import { createMulberry32 } from '../../utils/random';
 
 const Snow: React.FC = () => {
     const count = 1000;
     const pointsRef = useRef<THREE.Points>(null);
+    const randRef = useRef(createMulberry32(0x51ee0d));
 
     const { positions, velocities } = useMemo(() => {
+        const rand = createMulberry32(0x51ee0d);
         const positions = new Float32Array(count * 3);
         const velocities = new Float32Array(count * 3);
 
         for (let i = 0; i < count; i++) {
-            positions[i * 3] = (Math.random() - 0.5) * 50;
-            positions[i * 3 + 1] = Math.random() * 30;
-            positions[i * 3 + 2] = (Math.random() - 0.5) * 50;
+            positions[i * 3] = (rand() - 0.5) * 50;
+            positions[i * 3 + 1] = rand() * 30;
+            positions[i * 3 + 2] = (rand() - 0.5) * 50;
 
-            velocities[i * 3] = (Math.random() - 0.5) * 0.02;     // x
-            velocities[i * 3 + 1] = -(Math.random() * 0.05 + 0.01); // y (falling)
-            velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02; // z
+            velocities[i * 3] = (rand() - 0.5) * 0.02;     // x
+            velocities[i * 3 + 1] = -(rand() * 0.05 + 0.01); // y (falling)
+            velocities[i * 3 + 2] = (rand() - 0.5) * 0.02; // z
         }
         return { positions, velocities };
     }, []);
@@ -40,8 +43,8 @@ const Snow: React.FC = () => {
             // Reset if too low
             if (y < -15) {
                 y = 15;
-                x = (Math.random() - 0.5) * 50;
-                z = (Math.random() - 0.5) * 50;
+                x = (randRef.current() - 0.5) * 50;
+                z = (randRef.current() - 0.5) * 50;
             }
 
             posAttr.setXYZ(i, x, y, z);
@@ -55,8 +58,7 @@ const Snow: React.FC = () => {
                 <bufferAttribute
                     attach="attributes-position"
                     count={positions.length / 3}
-                    array={positions}
-                    itemSize={3}
+                    args={[positions, 3]}
                 />
             </bufferGeometry>
             <pointsMaterial

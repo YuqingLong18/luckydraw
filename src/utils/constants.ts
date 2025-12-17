@@ -1,9 +1,8 @@
 export const CONSTANTS = {
-    ANIMATION_DURATION: {
-        IGNITION: 1.5,
-        SHOWCASE: 7, // 6-8s
-        SLOWDOWN: 2.5, // 2-3s
-        REVEAL: 2, // 1.5-2s
+    DRAW: {
+        TOTAL_S: 10,
+        COMPLETE_AT_S: 8.5,
+        REVEAL_S: 1.5,
     },
     COLORS: {
         PRIMARY: '#E63946', // Christmas Red
