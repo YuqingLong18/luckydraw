@@ -25,6 +25,9 @@ export interface AppState {
   // isRunning: boolean; // Replaced by phase
   phase: Phase;
   currentWinner: string | null;
+  plannedWinner: string | null;
+  plannedWinnerIndex: number | null;
+  drawStartedAt: number | null;
 
   importNames: (names: string[]) => void;
   reset: () => void;
@@ -60,6 +63,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
   phase: 'IDLE',
   currentWinner: null,
+  plannedWinner: null,
+  plannedWinnerIndex: null,
+  drawStartedAt: null,
 
   importNames: (names: string[]) => {
     let cleanedNames = names
@@ -77,6 +83,9 @@ export const useStore = create<AppState>((set, get) => ({
       round: 1,
       phase: 'IDLE',
       currentWinner: null,
+      plannedWinner: null,
+      plannedWinnerIndex: null,
+      drawStartedAt: null,
     });
   },
 
@@ -88,21 +97,33 @@ export const useStore = create<AppState>((set, get) => ({
       round: 1,
       phase: 'IDLE',
       currentWinner: null,
+      plannedWinner: null,
+      plannedWinnerIndex: null,
+      drawStartedAt: null,
     });
   },
 
   startDraw: () => {
     const { phase, remainingNames } = get();
     if (phase !== 'IDLE' || remainingNames.length === 0) return;
-    set({ phase: 'RUNNING', currentWinner: null });
+    const idx = randomIntCrypto(remainingNames.length);
+    const winnerName = remainingNames[idx] ?? null;
+    set({
+      phase: 'RUNNING',
+      currentWinner: null,
+      plannedWinner: winnerName,
+      plannedWinnerIndex: winnerName ? idx : null,
+      drawStartedAt: Date.now(),
+    });
   },
 
   completeDraw: () => {
-    const { phase, remainingNames } = get();
+    const { phase, remainingNames, plannedWinner } = get();
     if (phase !== 'RUNNING') return;
 
-    // Pick winner
-    const winnerName = remainingNames[remainingNames.length - 1]; // Last one
+    // Winner is preselected at startDraw (still derived from remainingNames shuffle).
+    const winnerName = plannedWinner ?? remainingNames[remainingNames.length - 1] ?? null;
+    if (!winnerName) return;
 
     set({
       phase: 'WINNER_VIEW',
@@ -111,7 +132,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   dismissWinner: () => {
-    const { phase, currentWinner, remainingNames, round, winners } = get();
+    const { phase, currentWinner, remainingNames, plannedWinnerIndex, round, winners } = get();
     if (phase !== 'WINNER_VIEW' || !currentWinner) return;
 
     // Now we finalize the win
@@ -121,17 +142,23 @@ export const useStore = create<AppState>((set, get) => ({
       round,
     };
 
-    // Remove from remaining (it was the last one)
+    // Remove from remaining (remove exactly one occurrence).
     let newRemaining = remainingNames;
-    if (remainingNames[remainingNames.length - 1] === currentWinner) {
-      newRemaining = remainingNames.slice(0, -1);
+    if (plannedWinnerIndex !== null && remainingNames[plannedWinnerIndex] === currentWinner) {
+      newRemaining = remainingNames.slice(0, plannedWinnerIndex).concat(remainingNames.slice(plannedWinnerIndex + 1));
     } else {
-      newRemaining = remainingNames.filter(n => n !== currentWinner);
+      const fallbackIndex = remainingNames.indexOf(currentWinner);
+      if (fallbackIndex !== -1) {
+        newRemaining = remainingNames.slice(0, fallbackIndex).concat(remainingNames.slice(fallbackIndex + 1));
+      }
     }
 
     set({
       phase: 'IDLE',
       currentWinner: null,
+      plannedWinner: null,
+      plannedWinnerIndex: null,
+      drawStartedAt: null,
       winners: [...winners, winner],
       remainingNames: newRemaining,
       round: round + 1,

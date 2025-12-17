@@ -2,24 +2,36 @@ import React, { useMemo, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { Text as TroikaText } from 'troika-three-text';
 import { useStore } from '../../state/store';
 import { getTreePosition } from '../../utils/layout';
+import { CONSTANTS } from '../../utils/constants';
+
+type TextHandle = THREE.Object3D & {
+    color: THREE.Color | string;
+    fillOpacity: number;
+    outlineWidth: number;
+};
 
 const NameLabel: React.FC<{
     name: string;
     position: [number, number, number];
     rotation: [number, number, number];
-    isHighlighted: boolean;
-}> = React.memo(({ name, position, rotation, isHighlighted }) => {
+    mode: 'NORMAL' | 'DIM' | 'WINNER';
+    phase: 'IDLE' | 'RUNNING' | 'WINNER_VIEW';
+    labelIndex: number;
+    plannedWinnerIndex: number | null;
+    drawStartedAt: number | null;
+}> = React.memo(({ name, position, rotation, mode, phase, labelIndex, plannedWinnerIndex, drawStartedAt }) => {
     // Memoize to prevent re-renders of all 140 labels every frame
-    const textRef = useRef<TroikaText | null>(null);
+    const textRef = useRef<TextHandle | null>(null);
     const billboardRef = useRef({
         parentWorldQuat: new THREE.Quaternion(),
         invParentWorldQuat: new THREE.Quaternion(),
+        worldPos: new THREE.Vector3(),
+        tmpA: new THREE.Vector3(),
+        tmpB: new THREE.Vector3(),
     });
-    const color = isHighlighted ? '#ffd700' : 'white';
-    // const scaleFactor = isHighlighted ? 1.5 : (PlatformMobile() ? 0.5 : 0.8); // Smaller default, big highlight - UNUSED in my logic below because I set scale in useFrame
+    const color = mode === 'WINNER' ? '#ffd700' : mode === 'DIM' ? '#9aa0a6' : 'white';
 
     useFrame((state) => {
         if (!textRef.current) return;
@@ -32,16 +44,39 @@ const NameLabel: React.FC<{
             textRef.current.quaternion.copy(billboardRef.current.invParentWorldQuat).multiply(state.camera.quaternion);
         }
 
-        // Pulse if highlighted
-        if (isHighlighted) {
-            const s = 1.5 + Math.sin(state.clock.elapsedTime * 15) * 0.3;
+        if (mode === 'WINNER') {
+            const s = 1.6 + Math.sin(state.clock.elapsedTime * 10) * 0.15;
             textRef.current.scale.set(s, s, s);
             textRef.current.color = new THREE.Color('#ffd700');
             textRef.current.fillOpacity = 1;
+            textRef.current.outlineWidth = 0.04;
         } else {
-            textRef.current.scale.set(0.8, 0.8, 0.8); // Base scale
-            textRef.current.color = 'white';
-            textRef.current.fillOpacity = 0.9;
+            let nearBoost = 0;
+            if (phase === 'RUNNING' && plannedWinnerIndex !== null && drawStartedAt !== null) {
+                const elapsedMs = Date.now() - drawStartedAt;
+                const p = Math.min(1, Math.max(0, elapsedMs / (CONSTANTS.DRAW.COMPLETE_AT_S * 1000)));
+                const late = Math.min(1, Math.max(0, (p - 0.6) / 0.4));
+                if (late > 0) {
+                    const windowSize = Math.round(THREE.MathUtils.lerp(14, 2, late));
+                    if (Math.abs(labelIndex - plannedWinnerIndex) <= windowSize) nearBoost = late;
+                }
+            }
+
+            const baseScale = mode === 'DIM' ? 0.56 : THREE.MathUtils.lerp(0.62, 0.72, nearBoost);
+            textRef.current.scale.set(baseScale, baseScale, baseScale);
+            textRef.current.color = color;
+
+            let opacity = mode === 'DIM' ? 0.28 : THREE.MathUtils.lerp(0.82, 0.96, nearBoost);
+
+            // Extra-dim labels on the back side of the tree (relative to camera).
+            textRef.current.getWorldPosition(billboardRef.current.worldPos);
+            billboardRef.current.tmpA.set(billboardRef.current.worldPos.x, 0, billboardRef.current.worldPos.z).normalize();
+            billboardRef.current.tmpB.set(state.camera.position.x, 0, state.camera.position.z).normalize();
+            const hemisphereDot = billboardRef.current.tmpA.dot(billboardRef.current.tmpB);
+            if (hemisphereDot < 0) opacity *= 0.35;
+
+            textRef.current.fillOpacity = opacity;
+            textRef.current.outlineWidth = 0.012;
         }
     });
 
@@ -50,11 +85,11 @@ const NameLabel: React.FC<{
             ref={textRef}
             position={position}
             rotation={rotation}
-            fontSize={0.48}
+            fontSize={0.42}
             color={color}
             anchorX="center"
             anchorY="middle"
-            outlineWidth={0.015}
+            outlineWidth={0.012}
             outlineColor="#000"
             depthOffset={-1}
         >
@@ -66,6 +101,8 @@ const NameLabels: React.FC = () => {
     const remainingNames = useStore((state) => state.remainingNames);
     const phase = useStore((state) => state.phase);
     const currentWinner = useStore((state) => state.currentWinner);
+    const plannedWinnerIndex = useStore((state) => state.plannedWinnerIndex);
+    const drawStartedAt = useStore((state) => state.drawStartedAt);
 
     // Need to know the winner to highlight? 
     // The store `winners` has history. The logic for "who is being drawn" is disjoint.
@@ -86,40 +123,22 @@ const NameLabels: React.FC = () => {
 
     // OR better: Map all `remainingNames` to the first N slots.
 
-    const indexByName = useMemo(() => {
-        const map = new Map<string, number>();
-        for (let i = 0; i < remainingNames.length; i++) map.set(remainingNames[i], i);
-        return map;
-    }, [remainingNames]);
-
-    const visibleNames = useMemo(() => {
-        const MAX_VISIBLE = 48;
-        if (remainingNames.length <= MAX_VISIBLE) return remainingNames;
-
-        const stride = Math.ceil(remainingNames.length / MAX_VISIBLE);
-        const sampled: string[] = [];
-        for (let i = 0; i < remainingNames.length && sampled.length < MAX_VISIBLE; i += stride) {
-            sampled.push(remainingNames[i]);
-        }
-
-        if (phase === 'WINNER_VIEW' && currentWinner && !sampled.includes(currentWinner)) {
-            sampled[sampled.length - 1] = currentWinner;
-        }
-
-        return sampled;
-    }, [remainingNames, phase, currentWinner]);
+    const currentWinnerSet = useMemo(() => new Set(currentWinner ? [currentWinner] : []), [currentWinner]);
 
     return (
         <group>
-            {visibleNames.map((name) => {
-                const idx = indexByName.get(name);
-                if (idx === undefined) return null;
-
-                const { position, rotation } = getTreePosition(idx, remainingNames.length); // Recalculate based on current count?
+            {remainingNames.map((name, idx) => {
+                const { position, rotation } = getTreePosition(idx, remainingNames.length, 0.7);
                 // If we recalc based on current count, everyone moves when one is removed.
                 // That might be a cool effect? "Re-shuffling" on the tree.
                 // Or distracting.
                 // Given "pop" happens at end, it's fine.
+
+                let mode: 'NORMAL' | 'DIM' | 'WINNER' = 'NORMAL';
+
+                if (phase === 'WINNER_VIEW') {
+                    mode = currentWinnerSet.has(name) ? 'WINNER' : 'DIM';
+                }
 
                 return (
                     <NameLabel
@@ -127,7 +146,11 @@ const NameLabels: React.FC = () => {
                         name={name}
                         position={position}
                         rotation={rotation}
-                        isHighlighted={false} // Highlight logic needs refinement ideally
+                        mode={mode}
+                        phase={phase}
+                        labelIndex={idx}
+                        plannedWinnerIndex={plannedWinnerIndex}
+                        drawStartedAt={drawStartedAt}
                     />
                 );
             })}

@@ -19,7 +19,7 @@ const vertexShader = `
     float twinkle = sin(uTime * aSpeed + aOffset) * 0.5 + 0.5;
     float size = aSize * (0.8 + 0.4 * twinkle);
     
-    gl_PointSize = size * (300.0 / -mvPosition.z);
+    gl_PointSize = size * (380.0 / -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
     
     vColor = aColor * (0.8 + 0.2 * twinkle); // Pulse color too
@@ -45,7 +45,7 @@ const ChristmasTree: React.FC = () => {
 
     const { positions, sizes, speeds, offsets, colors } = useMemo(() => {
         const rand = createMulberry32(0xdecafbad);
-        const count = 5000; // Increased count for fuller tree
+        const count = 7000;
         const positions = new Float32Array(count * 3);
         const sizes = new Float32Array(count);
         const speeds = new Float32Array(count);
@@ -62,19 +62,19 @@ const ChristmasTree: React.FC = () => {
         const white = new THREE.Color('#ffffff');
 
         for (let i = 0; i < count; i++) {
-            // Create a layered cone effect or just simple cone?
-            // Simple cone with volume.
-
-            const h = rand() * height; // 0 to height (bottom to top relative)
-            // Actually our tree works better -height/2 to height/2
+            // Prefer a recognizable silhouette: mostly on the cone surface with a gentle spiral.
+            const t = i / count; // 0..1 bottom->top
+            const h = t * height;
             const y = h - height / 2;
-            const normalizedY = h / height; // 0 to 1
+            const normalizedY = h / height; // 0..1
 
             const rAtHeight = maxRadius * (1 - normalizedY);
 
-            // Volume distribution: more points near surface, some inside
-            const r = rAtHeight * Math.sqrt(rand()); // Sqrt for uniform area, but maybe we want surface mostly
-            const theta = rand() * Math.PI * 2;
+            const spiralTurns = 18;
+            const theta = t * spiralTurns * Math.PI * 2 + rand() * 0.35;
+
+            const surfaceBias = 0.92 + rand() * 0.08; // keep near surface
+            const r = rAtHeight * surfaceBias + (rand() - 0.5) * 0.08;
 
             const x = r * Math.cos(theta);
             const z = r * Math.sin(theta);
@@ -83,7 +83,7 @@ const ChristmasTree: React.FC = () => {
             positions[i * 3 + 1] = y;
             positions[i * 3 + 2] = z;
 
-            sizes[i] = rand() * 0.4 + 0.1;
+            sizes[i] = rand() * 0.55 + 0.15;
             speeds[i] = rand() * 5 + 1;
             offsets[i] = rand() * 10;
 
@@ -92,10 +92,10 @@ const ChristmasTree: React.FC = () => {
             const choice = rand();
             let col = green;
 
-            if (choice > 0.95) col = gold; // Ornaments
-            else if (choice > 0.9) col = red;
-            else if (choice > 0.88) col = white; // Lighter tips
-            else if (choice > 0.5) col = brightGreen;
+            if (choice > 0.975) col = gold; // Ornaments
+            else if (choice > 0.95) col = red;
+            else if (choice > 0.93) col = white; // Lighter tips
+            else if (choice > 0.4) col = brightGreen;
 
             colors[i * 3] = col.r;
             colors[i * 3 + 1] = col.g;
@@ -134,43 +134,49 @@ const ChristmasTree: React.FC = () => {
     });
 
     return (
-        <points ref={pointsRef}>
-            <bufferGeometry>
-                <bufferAttribute
-                    attach="attributes-position"
-                    count={positions.length / 3}
-                    args={[positions, 3]}
+        <group>
+            <mesh position={[0, -0.8, 0]} rotation={[0, 0, 0]}>
+                <coneGeometry args={[CONSTANTS.SCENE.TREE_RADIUS * 1.02, CONSTANTS.SCENE.TREE_HEIGHT * 0.92, 24, 1, true]} />
+                <meshBasicMaterial color="#1b4d34" wireframe transparent opacity={0.08} depthWrite={false} />
+            </mesh>
+            <points ref={pointsRef}>
+                <bufferGeometry>
+                    <bufferAttribute
+                        attach="attributes-position"
+                        count={positions.length / 3}
+                        args={[positions, 3]}
+                    />
+                    <bufferAttribute
+                        attach="attributes-aSize"
+                        count={sizes.length}
+                        args={[sizes, 1]}
+                    />
+                    <bufferAttribute
+                        attach="attributes-aSpeed"
+                        count={speeds.length}
+                        args={[speeds, 1]}
+                    />
+                    <bufferAttribute
+                        attach="attributes-aOffset"
+                        count={offsets.length}
+                        args={[offsets, 1]}
+                    />
+                    <bufferAttribute
+                        attach="attributes-aColor"
+                        count={colors.length / 3}
+                        args={[colors, 3]}
+                    />
+                </bufferGeometry>
+                <shaderMaterial
+                    vertexShader={vertexShader}
+                    fragmentShader={fragmentShader}
+                    uniforms={uniforms}
+                    transparent
+                    depthWrite={false}
+                    blending={THREE.AdditiveBlending}
                 />
-                <bufferAttribute
-                    attach="attributes-aSize"
-                    count={sizes.length}
-                    args={[sizes, 1]}
-                />
-                <bufferAttribute
-                    attach="attributes-aSpeed"
-                    count={speeds.length}
-                    args={[speeds, 1]}
-                />
-                <bufferAttribute
-                    attach="attributes-aOffset"
-                    count={offsets.length}
-                    args={[offsets, 1]}
-                />
-                <bufferAttribute
-                    attach="attributes-aColor"
-                    count={colors.length / 3}
-                    args={[colors, 3]}
-                />
-            </bufferGeometry>
-            <shaderMaterial
-                vertexShader={vertexShader}
-                fragmentShader={fragmentShader}
-                uniforms={uniforms}
-                transparent
-                depthWrite={false}
-                blending={THREE.AdditiveBlending}
-            />
-        </points>
+            </points>
+        </group>
     );
 };
 

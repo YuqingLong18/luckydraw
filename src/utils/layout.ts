@@ -1,6 +1,6 @@
 import { CONSTANTS } from './constants';
 
-export const getTreePosition = (index: number, total: number) => {
+export const getTreePosition = (index: number, total: number, radialOffset = 0) => {
     const height = CONSTANTS.SCENE.TREE_HEIGHT;
     const maxRadius = CONSTANTS.SCENE.TREE_RADIUS;
 
@@ -24,7 +24,7 @@ export const getTreePosition = (index: number, total: number) => {
     const normalizedY = (y + height / 2) / height; // 0 (bottom) to 1 (top)
 
     // Radius at Y (Cone tapers to top)
-    const r = maxRadius * (1 - normalizedY);
+    const r = maxRadius * (1 - normalizedY) + radialOffset;
 
     const theta = index * 2.39996 + Math.PI; // Golden angle offset
 
