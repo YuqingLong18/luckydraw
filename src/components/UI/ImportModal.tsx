@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../state/store';
+import { t } from '../../utils/i18n';
 
 interface ImportModalProps {
     onClose: () => void;
@@ -7,6 +8,7 @@ interface ImportModalProps {
 
 const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
     const importNames = useStore((state) => state.importNames);
+    const language = useStore((state) => state.language);
     const [text, setText] = useState('');
 
     const handleImport = () => {
@@ -30,8 +32,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                 width: 500,
                 maxWidth: '90%'
             }}>
-                <h2 style={{ marginTop: 0 }}>Import Names</h2>
-                <p style={{ color: '#aaa' }}>Paste names below, one per line.</p>
+                <h2 style={{ marginTop: 0 }}>{t(language, 'importTitle')}</h2>
+                <p style={{ color: '#aaa' }}>{t(language, 'importHint')}</p>
                 <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
@@ -47,8 +49,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                     }}
                 />
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                    <button onClick={onClose} style={{ background: 'transparent' }}>Cancel</button>
-                    <button onClick={handleImport} style={{ backgroundColor: '#E63946', color: 'white' }}>Import</button>
+                    <button onClick={onClose} style={{ background: 'transparent' }}>{t(language, 'cancel')}</button>
+                    <button onClick={handleImport} style={{ backgroundColor: '#E63946', color: 'white' }}>{t(language, 'import')}</button>
                 </div>
             </div>
         </div>

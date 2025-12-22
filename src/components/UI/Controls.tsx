@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../../state/store';
 import { CONSTANTS } from '../../utils/constants';
+import { t } from '../../utils/i18n';
 
 const Controls: React.FC<{ onImport?: () => void }> = ({ onImport }) => {
     const phase = useStore((state) => state.phase);
@@ -9,6 +10,7 @@ const Controls: React.FC<{ onImport?: () => void }> = ({ onImport }) => {
     const dismissWinner = useStore((state) => state.dismissWinner);
     const reset = useStore((state) => state.reset);
     const remainingNames = useStore((state) => state.remainingNames);
+    const language = useStore((state) => state.language);
     const completeTimeoutRef = React.useRef<number | null>(null);
 
     React.useEffect(() => {
@@ -43,10 +45,10 @@ const Controls: React.FC<{ onImport?: () => void }> = ({ onImport }) => {
     };
 
     const getButtonText = () => {
-        if (phase === 'RUNNING') return 'Drawing...';
-        if (phase === 'WINNER_VIEW') return 'RUN DRAW'; // Acts as "Resume"
-        if (remainingNames.length === 0) return 'Empty';
-        return 'RUN DRAW';
+        if (phase === 'RUNNING') return t(language, 'drawing');
+        if (phase === 'WINNER_VIEW') return t(language, 'runDraw'); // Acts as "Resume"
+        if (remainingNames.length === 0) return t(language, 'empty');
+        return t(language, 'runDraw');
     };
 
     return (
@@ -64,8 +66,30 @@ const Controls: React.FC<{ onImport?: () => void }> = ({ onImport }) => {
             >
                 {getButtonText()}
             </button>
-            <button onClick={reset} disabled={phase === 'RUNNING'} style={{ padding: '0.8em 1.2em' }}>Reset</button>
-            <button onClick={onImport} disabled={phase === 'RUNNING' || !onImport} style={{ padding: '0.8em 1.2em' }}>Import Names</button>
+            <button
+                onClick={reset}
+                disabled={phase === 'RUNNING'}
+                style={{
+                    padding: '0.8em 1.2em',
+                    backgroundColor: 'white',
+                    color: 'black',
+                    border: '1px solid rgba(0,0,0,0.2)'
+                }}
+            >
+                {t(language, 'reset')}
+            </button>
+            <button
+                onClick={onImport}
+                disabled={phase === 'RUNNING' || !onImport}
+                style={{
+                    padding: '0.8em 1.2em',
+                    backgroundColor: 'white',
+                    color: 'black',
+                    border: '1px solid rgba(0,0,0,0.2)'
+                }}
+            >
+                {t(language, 'importNames')}
+            </button>
         </div>
     );
 };

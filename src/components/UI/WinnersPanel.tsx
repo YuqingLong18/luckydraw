@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useStore } from '../../state/store';
+import { t } from '../../utils/i18n';
 
 const WinnersPanel: React.FC = () => {
     const winners = useStore((state) => state.winners);
     const remainingNames = useStore((state) => state.remainingNames);
+    const language = useStore((state) => state.language);
 
     // TBD: Collapsible?
     const [isOpen, setIsOpen] = useState(true);
@@ -11,7 +13,7 @@ const WinnersPanel: React.FC = () => {
     return (
         <div style={{
             position: 'absolute',
-            top: 20,
+            top: 70,
             right: 20,
             width: isOpen ? 300 : 'auto',
             maxHeight: '80vh',
@@ -27,19 +29,19 @@ const WinnersPanel: React.FC = () => {
             flexDirection: 'column'
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' }}>
-                <h3 style={{ margin: 0 }}>Winners ({winners.length})</h3>
+                <h3 style={{ margin: 0 }}>{t(language, 'winners')} ({winners.length})</h3>
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     style={{ padding: '0.2em 0.5em', background: 'transparent', border: 'none', color: 'white' }}
                 >
-                    {isOpen ? 'Close' : 'Show'}
+                    {isOpen ? t(language, 'close') : t(language, 'show')}
                 </button>
             </div>
 
             {isOpen && (
                 <>
                     <div style={{ marginBottom: 10, fontSize: '0.9em', color: '#aaa' }}>
-                        Remaining: {remainingNames.length}
+                        {t(language, 'remaining')}: {remainingNames.length}
                     </div>
                     <div style={{ overflowY: 'auto', flex: 1 }}>
                         {[...winners].reverse().map((w) => (
@@ -50,10 +52,10 @@ const WinnersPanel: React.FC = () => {
                                 justifyContent: 'space-between'
                             }}>
                                 <span style={{ fontWeight: 'bold' }}>{w.name}</span>
-                                <span style={{ fontSize: '0.8em', color: '#888' }}>R{w.round}</span>
+                                <span style={{ fontSize: '0.8em', color: '#888' }}>{t(language, 'round', { round: w.round })}</span>
                             </div>
                         ))}
-                        {winners.length === 0 && <div style={{ color: '#666', fontStyle: 'italic' }}>No winners yet</div>}
+                        {winners.length === 0 && <div style={{ color: '#666', fontStyle: 'italic' }}>{t(language, 'noWinners')}</div>}
                     </div>
                 </>
             )}

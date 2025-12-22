@@ -1,9 +1,11 @@
 import React from 'react';
 import { useStore } from '../../state/store';
+import { t } from '../../utils/i18n';
 
 const WinnerOverlay: React.FC = () => {
     const phase = useStore((state) => state.phase);
     const currentWinner = useStore((state) => state.currentWinner);
+    const language = useStore((state) => state.language);
 
     if (phase !== 'WINNER_VIEW' || !currentWinner) return null;
 
@@ -18,7 +20,7 @@ const WinnerOverlay: React.FC = () => {
             pointerEvents: 'none',
             textShadow: '0 0 20px rgba(0,0,0,0.8)',
         }}>
-            <div style={{ fontSize: '2rem', color: '#ccc', marginBottom: '1rem' }}>Winner</div>
+            <div style={{ fontSize: '2rem', color: '#ccc', marginBottom: '1rem' }}>{t(language, 'winner')}</div>
             <RoundDisplay />
         </div>
     );
@@ -26,7 +28,8 @@ const WinnerOverlay: React.FC = () => {
 
 const RoundDisplay = () => {
     const round = useStore(s => s.round);
-    return <div style={{ fontSize: '1.5rem', color: '#aaa', marginTop: '1rem' }}>Round {round}</div>;
+    const language = useStore(s => s.language);
+    return <div style={{ fontSize: '1.5rem', color: '#aaa', marginTop: '1rem' }}>{t(language, 'round', { round })}</div>;
 }
 
 export default WinnerOverlay;

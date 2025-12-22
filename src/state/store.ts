@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { randomIntCrypto } from '../utils/random';
+import type { Language } from '../utils/i18n';
 
 export type Phase = 'IDLE' | 'RUNNING' | 'WINNER_VIEW';
 
@@ -21,6 +22,7 @@ export interface AppState {
   remainingNames: string[];
   winners: Winner[];
   round: number;
+  language: Language;
   settings: Settings;
   // isRunning: boolean; // Replaced by phase
   phase: Phase;
@@ -36,6 +38,7 @@ export interface AppState {
   completeDraw: () => void;
   dismissWinner: () => void;
 
+  setLanguage: (language: Language) => void;
   updateSettings: (settings: Partial<Settings>) => void;
   // toggleRun: (isRunning: boolean) => void;
 }
@@ -55,6 +58,7 @@ export const useStore = create<AppState>((set, get) => ({
   remainingNames: [],
   winners: [],
   round: 1,
+  language: 'zh',
   settings: {
     persist: false,
     sound: false,
@@ -165,6 +169,7 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
+  setLanguage: (language) => set({ language }),
   updateSettings: (newSettings) =>
     set((state) => ({ settings: { ...state.settings, ...newSettings } })),
 }));
